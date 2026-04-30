@@ -122,7 +122,9 @@
                     <div class="document-item">
                         <div class="document-info">
                             <h5>
-                                {{ document.document_number|default:"Unnamed Document" }}
+                                <a href="{% url 'document_detail' document.id %}" class="text-decoration-none">
+                                    {{ document.document_number|default:"Unnamed Document" }}
+                                </a>
                             </h5>
                             <div class="document-meta">
                                 <span>📁 {{ document.file.name|truncatechars:40 }}</span>
@@ -130,10 +132,19 @@
                                 <span class="ms-3">💾 {{ document.file_type|upper }}</span>
                             </div>
                         </div>
-                        <div>
-                            <span class="badge status-badge bg-info">
-                                {{ document.get_status_display }}
-                            </span>
+                        <div class="d-flex align-items-center gap-3">
+                            {% if document.status == 'validated' %}
+                                <span class="badge bg-success">✓ Validated</span>
+                            {% elif document.status == 'review' %}
+                                <span class="badge bg-warning">⚠ Review</span>
+                            {% elif document.status == 'uploaded' %}
+                                <span class="badge bg-info">📤 Uploaded</span>
+                            {% else %}
+                                <span class="badge bg-danger">{{ document.status|title }}</span>
+                            {% endif %}
+                            <a href="{% url 'document_detail' document.id %}" class="btn btn-sm btn-outline-primary">
+                                Review →
+                            </a>
                         </div>
                     </div>
                 {% endfor %}

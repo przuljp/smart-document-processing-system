@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Review Document</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<div class="container mt-5">
+    <!-- Page Header -->
+    <div class="mb-4">
+        <a href="{% url 'dashboard' %}" class="btn btn-secondary btn-sm mb-3">← Back to Dashboard</a>
+        <h1>Review Document</h1>
+        <p class="text-muted">Document ID: #{{ document.id }} | Uploaded: {{ document.uploaded_at|date:"M d, Y H:i" }}</p>
+    </div>
+
+    <!-- Status Badge -->
+    <div class="mb-4">
+        {% if document.status == 'validated' %}
+            <span class="badge bg-success fs-6">✓ Validated</span>
+        {% elif document.status == 'review' %}
+            <span class="badge bg-warning fs-6">⚠ Needs Review</span>
+        {% elif document.status == 'uploaded' %}
+            <span class="badge bg-info fs-6">📤 Uploaded</span>
+        {% elif document.status == 'rejected' %}
+            <span class="badge bg-danger fs-6">✗ Rejected</span>
+        {% endif %}
+        
+        {% if document.doc_type %}
+            <span class="badge bg-secondary fs-6">{{ document.doc_type|title }}</span>
+        {% endif %}
+        
+        {% if document.currency %}
+            <span class="badge bg-dark fs-6">{{ document.currency }}</span>
+        {% endif %}
+    </div>
+
+   <!-- Validation Issues Alert (if any) -->
+    {% if validation_issues %}
+
+        <div class="alert {% if has_errors %}alert-danger{% else %}alert-warning{% endif %} alert-dismissible fade show" role="alert">
+        
+        <h5 class="alert-heading">
+            {% if has_errors %}
+                ❌ Validation Issues Found
+            {% else %}
+                ⚠️ Warnings
+            {% endif %}
+        </h5>
+
+            <ul class="mb-0">
+                {% for issue in validation_issues %}
+                    <li class="{% if issue.severity == 'error' %}text-danger fw-bold{% else %}text-warning{% endif %}">
+                        <strong>{{ issue.field|title }}</strong> ({{ issue.severity|upper }}):
+                        {{ issue.message }}
+                    </li>
+                {% endfor %}
+            </ul>
+            
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    {% else %}
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            ✓ No validation issues found. Document is ready to validate.
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    {% endif %}
+
+    <!-- Main Content Row -->
+    <div class="row">
+        <!-- Document Details Card -->
+        <div class="col-md-7">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Document Information</h5>
+                </div>
+                
+                <form method="POST" class="card-body">
+                    {% csrf_token %}
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            {{ form.supplier }}
+                            <small class="form-text text-muted d-block mt-1">
+                                Original: <code>{{ original_data.supplier|default:"-" }}</code>
+                            </small>
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.document_number }}
+                            <small class="form-text text-muted d-block mt-1">
+                                Original: <code>{{ original_data.document_number|default:"-" }}</code>
+                            </small>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            {{ form.issue_date }}
+                            <small class="form-text text-muted d-block mt-1">
+                                Original: <code>{{ original_data.issue_date|default:"-" }}</code>
+                            </small>
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.due_date }}
+                            <small class="form-text text-muted d-block mt-1">
+                                Original: <code>{{ original_data.due_date|default:"-" }}</code>
+                            </small>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            {{ form.subtotal }}
+                            <small class="form-text text-muted d-block mt-1">
+                                Original: <code>${{ original_data.subtotal|default:"-" }}</code>
+                            </small>
+                        </div>
+                        <div class="col-md-4">
+                            {{ form.tax }}
+                            <small class="form-text text-muted d-block mt-1">
+                                Original: <code>${{ original_data.tax|default:"-" }}</code>
+                            </small>
+                        </div>
+                        <div class="col-md-4">
+                            {{ form.total }}
+                            <small class="form-text text-muted d-block mt-1">
+                                Original: <code>${{ original_data.total|default:"-" }}</code>
+                            </small>
+                        </div>
+                    </div>
+
+                    <!-- Form Errors (if any) -->
+                    {% if form.non_field_errors %}
+                        <div class="alert alert-danger" role="alert">
+                            {% for error in form.non_field_errors %}
+                                <p class="mb-0">{{ error }}</p>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+
+                    <!-- Buttons -->
+                    <div class="d-grid gap-2 d-md-flex">
+                        <button type="submit" class="btn btn-primary">
+                            💾 Save & Revalidate
+                        </button>
+                        <a href="{% url 'dashboard' %}" class="btn btn-secondary">
+                            Cancel
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Sidebar: Quick Actions & Summary -->
+        <div class="col-md-5">
+            <!-- Mark as Validated Button -->
+            {% if not has_errors and document.status != 'rejected' %}
+                <div class="card shadow-sm mb-4 border-success">
+                    <div class="card-body">
+                        <form method="POST" action="{% url 'mark_as_validated' document.id %}">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-success w-100">
+                                Mark as Validated
+                            </button>
+                        </form>
+                        <small class="text-muted d-block mt-2">
+                            No errors found. Click to finalize validation.
+                        </small>
+                    </div>
+                </div>
+            {% elif document.status == 'rejected' %}
+                <div class="card shadow-sm mb-4 border-danger">
+                    <div class="card-body">
+                        <button type="button" class="btn btn-success w-100" disabled>
+                            Mark as Validated
+                        </button>
+                        <small class="text-danger d-block mt-2">
+                            This document has been rejected.
+                        </small>
+                    </div>
+                </div>
+            {% else %}
+                <div class="card shadow-sm mb-4 border-danger">
+                    <div class="card-body">
+                        <button type="button" class="btn btn-danger w-100" disabled>
+                            Mark as Validated
+                        </button>
+                        <small class="text-danger d-block mt-2">
+                            Fix errors above to enable validation.
+                        </small>
+                    </div>
+                </div>
+            {% endif %}
+
+            <div class="card shadow-sm mb-4 border-danger">
+                <div class="card-body">
+                    <form method="POST" action="{% url 'reject_document' document.id %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger w-100" onclick="return confirm('Are you sure you want to reject this document?');">
+                            Reject Document
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Document Summary -->
+            <div class="card shadow-sm">
+                <div class="card-header bg-light">
+                    <h6 class="mb-0">Summary</h6>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm mb-0">
+                        <tbody>
+                            <tr>
+                                <td><strong>Supplier:</strong></td>
+                                <td>
+                                    {% if document.supplier %}
+                                        <span class="badge bg-success">{{ document.supplier }}</span>
+                                    {% else %}
+                                        <span class="badge bg-danger">Missing</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Document #:</strong></td>
+                                <td>
+                                    {% if document.document_number %}
+                                        <span class="badge bg-success">{{ document.document_number }}</span>
+                                    {% else %}
+                                        <span class="badge bg-danger">Missing</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Issue Date:</strong></td>
+                                <td>
+                                    {% if document.issue_date %}
+                                        <span class="badge bg-success">{{ document.issue_date|date:"M d, Y" }}</span>
+                                    {% else %}
+                                        <span class="badge bg-danger">Missing</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Line Items:</strong></td>
+                                <td>
+                                    <span class="badge bg-info">{{ line_items|length }} items</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Validation Issues:</strong></td>
+                                <td>
+                                    {% if validation_issues %}
+                                        <span class="badge {% if has_errors %}bg-danger{% else %}bg-warning{% endif %}">
+                                            {{ validation_issues|length }} issue(s)
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-success">0 issues</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Line Items Table -->
+    {% if line_items %}
+        <div class="card shadow-sm mt-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">Line Items ({{ line_items|length }})</h5>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Description</th>
+                            <th class="text-end">Quantity</th>
+                            <th class="text-end">Unit Price</th>
+                            <th class="text-end">Total</th>
+                            <th class="text-center">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in line_items %}
+                            {% with issue=validation_issues|first %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ item.description }}</strong>
+                                    </td>
+                                    <td class="text-end">
+                                        {{ item.quantity|default_if_none:"-" }}
+                                    </td>
+                                    <td class="text-end">
+                                        ${{ item.unit_price|floatformat:2 }}
+                                    </td>
+                                    <td class="text-end">
+                                        <strong>${{ item.total|floatformat:2 }}</strong>
+                                    </td>
+                                    <td class="text-center">
+                                        {% if item.quantity and item.unit_price and item.total %}
+                                            <span class="badge bg-info">Checked</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">-</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endwith %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% endif %}
+
+    <!-- File Information -->
+    <div class="card shadow-sm mt-4">
+        <div class="card-header bg-light">
+            <h6 class="mb-0">File Information</h6>
+        </div>
+        <div class="card-body">
+            <table class="table table-sm mb-0">
+                <tbody>
+                    <tr>
+                        <td><strong>File Name:</strong></td>
+                        <td><code>{{ document.file.name|truncatechars:50 }}</code></td>
+                    </tr>
+                    <tr>
+                        <td><strong>File Type:</strong></td>
+                        <td><code>{{ document.file_type|upper }}</code></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Document Type:</strong></td>
+                        <td>
+                            <span class="badge bg-info">{{ document.doc_type|title }}</span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>Status:</strong></td>
+                        <td>
+                            {% if document.status == 'validated' %}
+                                <span class="badge bg-success">Validated</span>
+                            {% elif document.status == 'review' %}
+                                <span class="badge bg-warning">Needs Review</span>
+                            {% elif document.status == 'uploaded' %}
+                                <span class="badge bg-info">Uploaded</span>
+                            {% else %}
+                                <span class="badge bg-danger">{{ document.status|title }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>Uploaded At:</strong></td>
+                        <td>{{ document.uploaded_at|date:"M d, Y H:i" }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+
+
